@@ -1,22 +1,14 @@
 mode: Mainline
-major-version-bump-message: '\+major'
-minor-version-bump-message: '\+f'
-patch-version-bump-message: '\+b'
+commit-message-incrementing: MergeMessageOnly
 branches:
-  master:
-    regex: ^master$
-    tag: ""
-    increment: Minor
-    is-mainline: true
-
+  main:
+    regex: ^main$
+    tag: ''
   feature:
     regex: ^feature/
     tag: useBranchName
-    increment: Patch
-
-  bug:
-    regex: ^bug/
+    increment: Minor
+  hotfix:
+    regex: ^hotfix/
     tag: useBranchName
     increment: Patch
-    source-branches:
-      - master
