@@ -1,0 +1,16 @@
+replicaCount: 1
+
+image:
+  repository: ortestacr.azurecr.io/testapp
+
+containerPort: 3000
+
+service:
+  port: 3000
+
+ingress:
+  class: azure/application-gateway
+  path: /
+service:
+  port: 3000
+

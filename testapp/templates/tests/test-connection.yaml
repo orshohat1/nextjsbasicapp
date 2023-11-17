@@ -1,0 +1,13 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: connectivity-test
+spec:
+  template:
+    spec:
+      containers:
+      - name: test-container
+        image: curlimages/curl:latest
+        command: ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "http://20.229.50.92"]
+      restartPolicy: Never
+  backoffLimit: 1

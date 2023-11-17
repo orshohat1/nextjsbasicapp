@@ -1,93 +1,97 @@
-# This workflow will build and push an application to a Azure Kubernetes Service (AKS) cluster when you push your code
-#
-# This workflow assumes you have already created the target AKS cluster and have created an Azure Container Registry (ACR)
-# The ACR should be attached to the AKS cluster
-# For instructions see:
-#   - https://docs.microsoft.com/en-us/azure/aks/kubernetes-walkthrough-portal
-#   - https://docs.microsoft.com/en-us/azure/container-registry/container-registry-get-started-portal
-#   - https://learn.microsoft.com/en-us/azure/aks/cluster-container-registry-integration?tabs=azure-cli#configure-acr-integration-for-existing-aks-clusters
-#   - https://github.com/Azure/aks-create-action
-#
-# To configure this workflow:
-#
-# 1. Set the following secrets in your repository (instructions for getting these
-#    https://docs.microsoft.com/en-us/azure/developer/github/connect-from-azure?tabs=azure-cli%2Clinux)):
-#    - AZURE_CLIENT_ID
-#    - AZURE_TENANT_ID
-#    - AZURE_SUBSCRIPTION_ID
-#
-# 2. Set the following environment variables (or replace the values below):
-#    - AZURE_CONTAINER_REGISTRY (name of your container registry / ACR)
-#    - CONTAINER_NAME (name of the container image you would like to push up to your ACR)
-#    - RESOURCE_GROUP (where your cluster is deployed)
-#    - CLUSTER_NAME (name of your AKS cluster)
-#    - IMAGE_PULL_SECRET_NAME (name of the ImagePullSecret that will be created to pull your ACR image)
-#
-# 3. Choose the appropriate render engine for the bake step https://github.com/Azure/k8s-bake. The config below assumes Helm.
-#    Set your helmChart, overrideFiles, overrides, and helm-version to suit your configuration.
-#    - CHART_PATH (path to your helm chart)
-#    - CHART_OVERRIDE_PATH (path to your helm chart with override values)
-#
-# For more information on GitHub Actions for Azure, refer to https://github.com/Azure/Actions
-# For more samples to get started with GitHub Action workflows to deploy to Azure, refer to https://github.com/Azure/actions-workflow-samples
-# For more options with the actions used below please refer to https://github.com/Azure/login
-
 name: Build and deploy an app to AKS with Helm
-
 on:
   push:
     branches: ["main"]
   workflow_dispatch:
 
 env:
-  AZURE_CONTAINER_REGISTRY: "your-azure-container-registry"
-  CONTAINER_NAME: "your-container-name"
-  RESOURCE_GROUP: "your-resource-group"
-  CLUSTER_NAME: "your-cluster-name"
-  CHART_PATH: "your-chart-path"
-  CHART_OVERRIDE_PATH: "your-chart-override-path"
+  AZURE_CONTAINER_REGISTRY: "ortestacr"
+  RESOURCE_GROUP: "or-test-rg"
+  CLUSTER_NAME: "ortestaks"
 
 jobs:
-  buildImage:
-    permissions:
-      contents: read
-      id-token: write
-    runs-on: ubuntu-latest
+  set-version:
+    name: "Set Version"
+    runs-on: self-hosted
+    outputs: 
+      version: ${{ steps.gitversion.outputs.version }}
     steps:
-      # Checks out the repository this file is in
+
+      # fetch-depth: 0 means all git history would be checked out
+      - name: Checkout working branch
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: '0'
+
+      # Initiate gitversion and output the variables to other jobs
+      - name: Initiate GitVersion 
+        id: gitversion
+        run: |
+          output=$(gitversion /output json /showvariable MajorMinorPatch)
+          echo "::set-output name=version::$output"
+
+  buildImage:
+    needs: [set-version]
+    runs-on: self-hosted
+    env:
+      version: ${{ needs.set-version.outputs.version }}
+    steps:
+      # Checks out the repository
       - uses: actions/checkout@v3
 
-      # Logs in with your Azure credentials
-      - name: Azure login
-        uses: azure/login@v1.4.6
+      # Logs in with Azure credentials
+      - name: Azure Login
+        run: az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+      
+      # Generating and logging in with a temp token 
+      - name: Get ACR token
+        id: get_acr_token
+        run: |
+          # Get ACR token
+          TOKEN=$(az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}  \
+            --expose-token \
+            --output tsv \
+            --query accessToken)
+        
+          # Check if fetch token succeeded
+          [[ $? -ne 0 ]] && echo "::error::helm unable to login into registry" && exit 1
+
+          # Expose output to next step
+          echo "::set-output name=acr_token::$TOKEN"
+      
+      - uses: azure/docker-login@v1
         with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          login-server: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io
+          username: 00000000-0000-0000-0000-000000000000
+          password: ${{ steps.get_acr_token.outputs.acr_token }}
 
       # Builds and pushes an image up to your Azure Container Registry
       - name: Build and push image to ACR
         run: |
-          az acr build --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:${{ github.sha }} --registry ${{ env.AZURE_CONTAINER_REGISTRY }} -g ${{ env.RESOURCE_GROUP }} .
+          docker buildx build . --push \
+          -t ${{env.AZURE_CONTAINER_REGISTRY}}.azurecr.io/testapp:${{env.version}} \
+          -f Dockerfile \
+          --build-arg Version=${{ env.version }} \
+          --build-arg Commit=${{ github.sha }} \
+          --build-arg Branch=${{ github.head_ref }} \
+          || (echo "::error::Unable to build and push docker image" && exit 1)
+      
+      # Scan the newly created docker image with trivy
+      - name: Scan the image
+        run: |
+          trivy image ${{env.AZURE_CONTAINER_REGISTRY}}.azurecr.io/testapp:${{env.version}} --scanners vuln
+        continue-on-error: true
 
   deploy:
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    runs-on: ubuntu-latest
-    needs: [buildImage]
+    runs-on: self-hosted
+    needs: [set-version, buildImage]
+    env:
+      version: ${{ needs.set-version.outputs.version }}
     steps:
-      # Checks out the repository this file is in
-      - uses: actions/checkout@v3
 
-      # Logs in with your Azure credentials
-      - name: Azure login
-        uses: azure/login@v1.4.6
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+       # Logs in with Azure credentials
+      - name: Azure Login
+        run: az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
 
       # Use kubelogin to configure your kubeconfig for Azure auth
       - name: Set up kubelogin for non-interactive login
@@ -101,26 +105,70 @@ jobs:
         with:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.CLUSTER_NAME }}
-          admin: 'false'
+          admin: 'true'
           use-kubelogin: 'true'
 
-      # Runs Helm to create manifest files
-      - name: Bake deployment
-        uses: azure/k8s-bake@v2
-        with:
-          renderEngine: "helm"
-          helmChart: ${{ env.CHART_PATH }}
-          overrideFiles: ${{ env.CHART_OVERRIDE_PATH }}
-          overrides: |
-            replicas:2
-          helm-version: "latest"
-        id: bake
+      # Helm dry-run to verify that the chart is supported by the k8s APIs 
+      - name: Helm dry-run
+        working-directory: testapp
+        run: |
+          helm upgrade testapp ./ \
+            --install \
+            -f ./values.yaml \
+            --dry-run \
+            || (echo "::error::Helm dry run test failed." && exit 1)
 
-      # Deploys application based on manifest files from previous step
-      - name: Deploy application
-        uses: Azure/k8s-deploy@v4
-        with:
-          action: deploy
-          manifests: ${{ steps.bake.outputs.manifestsBundle }}
-          images: |
-            ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.CONTAINER_NAME }}:${{ github.sha }}
+        # Deploying the helm 
+      - name: Helm deployment
+        working-directory: testapp
+        run: |
+            helm upgrade testapp ./ \
+              --install \
+              --set image.tag=${{ env.version }} \
+              -f ./values.yaml \
+              --wait \
+              --timeout 500s \
+              || (echo "::error::Helm unable to install version ${{ env.version }}." && exit 1)
+  
+  post-deployment:
+    name: "Post deployment helm test"
+    runs-on: self-hosted
+    needs: [deploy]
+    steps:
+
+       # Log in with Azure credentials to the cluster
+        - name: Azure AKS login
+          run: |
+            az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+            az aks get-credentials --resource-group ${{env.RESOURCE_GROUP}} --name ${{env.CLUSTER_NAME}} --admin
+            export KUBECONFIG=~/.kube/config
+            kubelogin convert-kubeconfig -l spn --client-id ${{ secrets.AZURE_CLIENT_ID }} --client-secret ${{ secrets.AZURE_CLIENT_SECRET }}
+        
+      # Executing helm tests
+        - name: "Run post deployent tests"
+          id: helmTest
+          run: |
+            helm test testapp \
+            || (echo "::error::Post deployent tests failed" && exit 1)
+  
+  # Adding stable tag to the image and helm chart
+  tag-as-stable:
+    name: "Tag image as stable"
+    runs-on: self-hosted
+    needs: [set-version,post-deployment]
+    env:
+      version: ${{ needs.set-version.outputs.version }}
+    steps:
+      
+      # Logs in with Azure credentials
+      - name: Azure Login
+        run: az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+
+      # Tagging the image
+      - name: "Tag image as stable"
+        run: |
+          az acr import \
+            --name "${{ env.AZURE_CONTAINER_REGISTRY }}" \
+            --source "${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/testapp:${{ env.version }}" \
+            --image "testapp:${{ env.version }}-stable" \
+            --force || (echo "::error::Unable to tag image version ${{ env.version }} as stable." && exit 1)
