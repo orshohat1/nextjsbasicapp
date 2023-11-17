@@ -1,13 +1,13 @@
-apiVersion: batch/v1
-kind: Job
+apiVersion: v1
+kind: Pod
 metadata:
-  name: connectivity-test
+  name: {{ .Release.Name }}-http-check
+  annotations:
+    "helm.sh/hook": test
 spec:
-  template:
-    spec:
-      containers:
-      - name: test-container
-        image: curlimages/curl:latest
-        command: ["sh", "-c", "response=$(curl -s -o /dev/null -w '%{http_code}' http://20.229.50.92) && [ $response -eq 200 ]"]
-      restartPolicy: Never
-  backoffLimit: 1
+  containers:
+    - name: http-check
+      image: busybox
+      command: ['wget']
+      args: ['--spider', '--timeout=5', 'http://20.229.50.92/']
+  restartPolicy: Never
