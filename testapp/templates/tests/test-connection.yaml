@@ -9,5 +9,5 @@ spec:
     - name: http-check
       image: busybox
       command: ['wget']
-      args: ['--spider', '--timeout=5', 'http://20.229.50.92/']
+      args: ['--spider', '--timeout=5', 'http://20.73.194.212']
   restartPolicy: Never
