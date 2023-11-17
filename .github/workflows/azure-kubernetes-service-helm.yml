@@ -89,24 +89,13 @@ jobs:
       version: ${{ needs.set-version.outputs.version }}
     steps:
 
-       # Logs in with Azure credentials
-      - name: Azure Login
-        run: az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-
-      # Use kubelogin to configure your kubeconfig for Azure auth
-      - name: Set up kubelogin for non-interactive login
-        uses: azure/use-kubelogin@v1
-        with:
-          kubelogin-version: 'v0.0.25'
-
-      # Retrieves your Azure Kubernetes Service cluster's kubeconfig file
-      - name: Get K8s context
-        uses: azure/aks-set-context@v3
-        with:
-          resource-group: ${{ env.RESOURCE_GROUP }}
-          cluster-name: ${{ env.CLUSTER_NAME }}
-          admin: 'true'
-          use-kubelogin: 'true'
+      # Log in with Azure credentials to the cluster
+      - name: Azure AKS login
+        run: |
+          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+          az aks get-credentials --resource-group ${{env.RESOURCE_GROUP}} --name ${{env.CLUSTER_NAME}} --admin
+          export KUBECONFIG=~/.kube/config
+          kubelogin convert-kubeconfig -l spn --client-id ${{ secrets.AZURE_CLIENT_ID }} --client-secret ${{ secrets.AZURE_CLIENT_SECRET }}
 
       # Helm dry-run to verify that the chart is supported by the k8s APIs 
       - name: Helm dry-run
