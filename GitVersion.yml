@@ -1,14 +1,24 @@
 mode: Mainline
 commit-message-incrementing: MergeMessageOnly
 branches:
-  main:
-    regex: ^main$
+  master:
+    regex: main
     tag: ''
   feature:
-    regex: ^feature/
+    regex: feature(s)?[/-]
     tag: useBranchName
     increment: Minor
+  develop:
+    regex: dev(elop)?(ment)?$
+    mode: ContinuousDeployment
+    tag: alpha
   hotfix:
-    regex: ^hotfix/
+    regex: hotfix(es)?[/-]
     tag: useBranchName
     increment: Patch
+  release:
+    regex: release(s)?[/-]
+    mode: ContinuousDeployment
+    tag: rc
+ignore:
+  sha: []
