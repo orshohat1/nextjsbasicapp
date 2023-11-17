@@ -8,6 +8,6 @@ spec:
       containers:
       - name: test-container
         image: curlimages/curl:latest
-        command: ["curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "http://20.229.50.92"]
+        command: ["sh", "-c", "response=$(curl -s -o /dev/null -w '%{http_code}' http://20.229.50.92) && [ $response -eq 200 ]"]
       restartPolicy: Never
   backoffLimit: 1
