@@ -138,6 +138,7 @@ jobs:
         - name: "Run post deployent tests"
           id: helmTest
           run: |
+            sleep 60
             helm test testapp \
             || (echo "::error::Post deployent tests failed" && exit 1)
   
