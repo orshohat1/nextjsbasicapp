@@ -6,7 +6,7 @@ This GitHub Actions workflow automates the building and deploying process of an 
 
 ### `set-version`
 
-- **Purpose**: Sets the version of the application based on the commit history.
+- **Purpose**: Perform static application secutrity testing using CodeQL, sets the version of the application based on the commit history. 
 - **Runs on**: Self-hosted runner.
 
 ### `buildImage`

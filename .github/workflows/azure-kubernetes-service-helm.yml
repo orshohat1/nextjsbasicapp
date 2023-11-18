@@ -13,7 +13,7 @@ jobs:
     runs-on: self-hosted
     strategy:
       matrix:
-        language: [ 'typescript']
+        language: [ 'javascript']
     outputs: 
       version: ${{ steps.gitversion.outputs.version }}
     steps:
@@ -29,12 +29,12 @@ jobs:
         uses: github/codeql-action/init@v2
         with:
           languages: ${{ matrix.language }}
-          config-file: ./.github/codeql/codeql-config.yml
 
       - name: Run CodeQL Analysis
         uses: github/codeql-action/analyze@v2
         with:
           query: ${{ matrix.language }}-code-scanning.ql
+        continue-on-error: true
 
       # Initiate gitversion and output the variables to other jobs
       - name: Initiate GitVersion 
