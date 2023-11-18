@@ -1,7 +1,5 @@
 name: Build and deploy an app to AKS with Helm
 on:
-  push:
-    branches: ["main"]
   workflow_dispatch:
 
 env:
@@ -77,10 +75,10 @@ jobs:
           || (echo "::error::Unable to build and push docker image" && exit 1)
       
       # Scan the newly created docker image with trivy
-      # - name: Scan the image
-      #   run: |
-      #     trivy image ${{env.AZURE_CONTAINER_REGISTRY}}.azurecr.io/testapp:${{env.version}} --scanners vuln
-      #   continue-on-error: true
+      - name: Scan the image
+        run: |
+          trivy image ${{env.AZURE_CONTAINER_REGISTRY}}.azurecr.io/testapp:${{env.version}} --scanners vuln
+        continue-on-error: true
 
   deploy:
     runs-on: self-hosted
