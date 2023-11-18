@@ -26,12 +26,12 @@ jobs:
       
       # Perform static application security testing using CodeQL
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v1
+        uses: github/codeql-action/init@v2
         with:
           languages: ${{ matrix.language }}
 
       - name: Run CodeQL Analysis
-        uses: github/codeql-action/analyze@v1
+        uses: github/codeql-action/analyze@v2
         with:
           query: ${{ matrix.language }}-code-scanning.ql
 
