@@ -11,6 +11,9 @@ jobs:
   set-version:
     name: "Set Version"
     runs-on: self-hosted
+    strategy:
+      matrix:
+        language: [ 'typescript']
     outputs: 
       version: ${{ steps.gitversion.outputs.version }}
     steps:
@@ -20,6 +23,17 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: '0'
+      
+      # Perform static application security testing using CodeQL
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v1
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/analyze@v1
+        with:
+          query: ${{ matrix.language }}-code-scanning.ql
 
       # Initiate gitversion and output the variables to other jobs
       - name: Initiate GitVersion 
@@ -28,136 +42,136 @@ jobs:
           output=$(gitversion /output json /showvariable MajorMinorPatch)
           echo "::set-output name=version::$output"
 
-  buildImage:
-    needs: [set-version]
-    runs-on: self-hosted
-    env:
-      version: ${{ needs.set-version.outputs.version }}
-    steps:
-      # Checks out the repository
-      - uses: actions/checkout@v3
+  # buildImage:
+  #   needs: [set-version]
+  #   runs-on: self-hosted
+  #   env:
+  #     version: ${{ needs.set-version.outputs.version }}
+  #   steps:
+  #     # Checks out the repository
+  #     - uses: actions/checkout@v3
 
-      # Logs in with Azure credentials
-      - name: Azure Login
-        run: az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+  #     # Logs in with Azure credentials
+  #     - name: Azure Login
+  #       run: az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
       
-      # Generating and logging in with a temp token 
-      - name: Get ACR token
-        id: get_acr_token
-        run: |
-          # Get ACR token
-          TOKEN=$(az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}  \
-            --expose-token \
-            --output tsv \
-            --query accessToken)
+  #     # Generating and logging in with a temp token 
+  #     - name: Get ACR token
+  #       id: get_acr_token
+  #       run: |
+  #         # Get ACR token
+  #         TOKEN=$(az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}  \
+  #           --expose-token \
+  #           --output tsv \
+  #           --query accessToken)
         
-          # Check if fetch token succeeded
-          [[ $? -ne 0 ]] && echo "::error::helm unable to login into registry" && exit 1
+  #         # Check if fetch token succeeded
+  #         [[ $? -ne 0 ]] && echo "::error::helm unable to login into registry" && exit 1
 
-          # Expose output to next step
-          echo "::set-output name=acr_token::$TOKEN"
+  #         # Expose output to next step
+  #         echo "::set-output name=acr_token::$TOKEN"
       
-      - uses: azure/docker-login@v1
-        with:
-          login-server: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io
-          username: 00000000-0000-0000-0000-000000000000
-          password: ${{ steps.get_acr_token.outputs.acr_token }}
+  #     - uses: azure/docker-login@v1
+  #       with:
+  #         login-server: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io
+  #         username: 00000000-0000-0000-0000-000000000000
+  #         password: ${{ steps.get_acr_token.outputs.acr_token }}
 
-      # Builds and pushes an image up to your Azure Container Registry
-      - name: Build and push image to ACR
-        run: |
-          docker buildx build . --push \
-          -t ${{env.AZURE_CONTAINER_REGISTRY}}.azurecr.io/testapp:${{env.version}} \
-          -f Dockerfile \
-          --build-arg Version=${{ env.version }} \
-          --build-arg Commit=${{ github.sha }} \
-          --build-arg Branch=${{ github.head_ref }} \
-          || (echo "::error::Unable to build and push docker image" && exit 1)
+  #     # Builds and pushes an image up to your Azure Container Registry
+  #     - name: Build and push image to ACR
+  #       run: |
+  #         docker buildx build . --push \
+  #         -t ${{env.AZURE_CONTAINER_REGISTRY}}.azurecr.io/testapp:${{env.version}} \
+  #         -f Dockerfile \
+  #         --build-arg Version=${{ env.version }} \
+  #         --build-arg Commit=${{ github.sha }} \
+  #         --build-arg Branch=${{ github.head_ref }} \
+  #         || (echo "::error::Unable to build and push docker image" && exit 1)
       
-      # Scan the newly created docker image with trivy
-      - name: Scan the image
-        run: |
-          trivy image ${{env.AZURE_CONTAINER_REGISTRY}}.azurecr.io/testapp:${{env.version}} --scanners vuln
-        continue-on-error: true
+  #     # Scan the newly created docker image with trivy
+  #     - name: Scan the image
+  #       run: |
+  #         trivy image ${{env.AZURE_CONTAINER_REGISTRY}}.azurecr.io/testapp:${{env.version}} --scanners vuln
+  #       continue-on-error: true
 
-  deploy:
-    runs-on: self-hosted
-    needs: [set-version, buildImage]
-    env:
-      version: ${{ needs.set-version.outputs.version }}
-    steps:
+  # deploy:
+  #   runs-on: self-hosted
+  #   needs: [set-version, buildImage]
+  #   env:
+  #     version: ${{ needs.set-version.outputs.version }}
+  #   steps:
 
-      # Log in with Azure credentials to the cluster
-      - name: Azure AKS login
-        run: |
-          az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-          az aks get-credentials --resource-group ${{env.RESOURCE_GROUP}} --name ${{env.CLUSTER_NAME}} --admin
-          export KUBECONFIG=~/.kube/config
-          kubelogin convert-kubeconfig -l spn --client-id ${{ secrets.AZURE_CLIENT_ID }} --client-secret ${{ secrets.AZURE_CLIENT_SECRET }}
+  #     # Log in with Azure credentials to the cluster
+  #     - name: Azure AKS login
+  #       run: |
+  #         az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+  #         az aks get-credentials --resource-group ${{env.RESOURCE_GROUP}} --name ${{env.CLUSTER_NAME}} --admin
+  #         export KUBECONFIG=~/.kube/config
+  #         kubelogin convert-kubeconfig -l spn --client-id ${{ secrets.AZURE_CLIENT_ID }} --client-secret ${{ secrets.AZURE_CLIENT_SECRET }}
 
-      # Helm dry-run to verify that the chart is supported by the k8s APIs 
-      - name: Helm dry-run
-        working-directory: testapp
-        run: |
-          helm upgrade testapp ./ \
-            --install \
-            --set image.tag=${{ env.version }} \
-            -f ./values.yaml \
-            --dry-run \
-            || (echo "::error::Helm dry run test failed." && exit 1)
+  #     # Helm dry-run to verify that the chart is supported by the k8s APIs 
+  #     - name: Helm dry-run
+  #       working-directory: testapp
+  #       run: |
+  #         helm upgrade testapp ./ \
+  #           --install \
+  #           --set image.tag=${{ env.version }} \
+  #           -f ./values.yaml \
+  #           --dry-run \
+  #           || (echo "::error::Helm dry run test failed." && exit 1)
 
-        # Deploying the helm 
-      - name: Helm deployment
-        working-directory: testapp
-        run: |
-            helm upgrade testapp ./ \
-              --install \
-              --set image.tag=${{ env.version }} \
-              -f ./values.yaml \
-              --wait \
-              --timeout 500s \
-              || (echo "::error::Helm unable to install version ${{ env.version }}." && exit 1)
+  #       # Deploying the helm 
+  #     - name: Helm deployment
+  #       working-directory: testapp
+  #       run: |
+  #           helm upgrade testapp ./ \
+  #             --install \
+  #             --set image.tag=${{ env.version }} \
+  #             -f ./values.yaml \
+  #             --wait \
+  #             --timeout 500s \
+  #             || (echo "::error::Helm unable to install version ${{ env.version }}." && exit 1)
   
-  post-deployment:
-    name: "Post deployment helm test"
-    runs-on: self-hosted
-    needs: [deploy]
-    steps:
+  # post-deployment:
+  #   name: "Post deployment helm test"
+  #   runs-on: self-hosted
+  #   needs: [deploy]
+  #   steps:
 
-       # Log in with Azure credentials to the cluster
-        - name: Azure AKS login
-          run: |
-            az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
-            az aks get-credentials --resource-group ${{env.RESOURCE_GROUP}} --name ${{env.CLUSTER_NAME}} --admin
-            export KUBECONFIG=~/.kube/config
-            kubelogin convert-kubeconfig -l spn --client-id ${{ secrets.AZURE_CLIENT_ID }} --client-secret ${{ secrets.AZURE_CLIENT_SECRET }}
+  #      # Log in with Azure credentials to the cluster
+  #       - name: Azure AKS login
+  #         run: |
+  #           az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+  #           az aks get-credentials --resource-group ${{env.RESOURCE_GROUP}} --name ${{env.CLUSTER_NAME}} --admin
+  #           export KUBECONFIG=~/.kube/config
+  #           kubelogin convert-kubeconfig -l spn --client-id ${{ secrets.AZURE_CLIENT_ID }} --client-secret ${{ secrets.AZURE_CLIENT_SECRET }}
         
-      # Executing helm tests
-        - name: "Run post deployent tests"
-          id: helmTest
-          run: |
-            sleep 60
-            helm test testapp \
-            || (echo "::error::Post deployent tests failed" && exit 1)
+  #     # Executing helm tests
+  #       - name: "Run post deployent tests"
+  #         id: helmTest
+  #         run: |
+  #           sleep 60
+  #           helm test testapp \
+  #           || (echo "::error::Post deployent tests failed" && exit 1)
   
-  # Adding stable tag to the image and helm chart
-  tag-as-stable:
-    name: "Tag image as stable"
-    runs-on: self-hosted
-    needs: [set-version,post-deployment]
-    env:
-      version: ${{ needs.set-version.outputs.version }}
-    steps:
+  # # Adding stable tag to the image and helm chart
+  # tag-as-stable:
+  #   name: "Tag image as stable"
+  #   runs-on: self-hosted
+  #   needs: [set-version,post-deployment]
+  #   env:
+  #     version: ${{ needs.set-version.outputs.version }}
+  #   steps:
       
-      # Logs in with Azure credentials
-      - name: Azure Login
-        run: az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
+  #     # Logs in with Azure credentials
+  #     - name: Azure Login
+  #       run: az login --service-principal -u ${{ secrets.AZURE_CLIENT_ID }} -p ${{ secrets.AZURE_CLIENT_SECRET }} --tenant ${{ secrets.AZURE_TENANT_ID }}
 
-      # Tagging the image
-      - name: "Tag image as stable"
-        run: |
-          az acr import \
-            --name "${{ env.AZURE_CONTAINER_REGISTRY }}" \
-            --source "${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/testapp:${{ env.version }}" \
-            --image "testapp:${{ env.version }}-stable" \
-            --force || (echo "::error::Unable to tag image version ${{ env.version }} as stable." && exit 1)
+  #     # Tagging the image
+  #     - name: "Tag image as stable"
+  #       run: |
+  #         az acr import \
+  #           --name "${{ env.AZURE_CONTAINER_REGISTRY }}" \
+  #           --source "${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/testapp:${{ env.version }}" \
+  #           --image "testapp:${{ env.version }}-stable" \
+  #           --force || (echo "::error::Unable to tag image version ${{ env.version }} as stable." && exit 1)
