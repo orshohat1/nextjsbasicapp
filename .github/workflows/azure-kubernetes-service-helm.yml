@@ -8,21 +8,42 @@ env:
   CLUSTER_NAME: "ortestaks"
 
 jobs:
+  analyze:
+    name: "Analyze"
+    runs-on: self-hosted
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'javascript-typescript' ]
+    steps:
+      
+      # fetch-depth: 0 means all git history would be checked out
+    - name: Checkout working branch
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: '0'
+    
+    # Initializes the CodeQL tools for scanning.
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: ${{ matrix.language }}
+    
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+      with:
+        category: "/language:${{matrix.language}}"
+
   set-version:
     name: "Set Version"
     runs-on: self-hosted
-    strategy:
-      matrix:
-        language: [ 'javascript']
     outputs: 
       version: ${{ steps.gitversion.outputs.version }}
     steps:
-
-      # fetch-depth: 0 means all git history would be checked out
-      - name: Checkout working branch
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: '0'
 
       # Initiate gitversion and output the variables to other jobs
       - name: Initiate GitVersion 

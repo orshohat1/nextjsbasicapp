@@ -4,9 +4,18 @@ This GitHub Actions workflow automates the building and deploying process of an 
 
 ## Jobs and Their Purpose
 
+### `analyze`
+
+- **Purpose**: Conducts static application security testing using CodeQL for specified languages.
+- **Runs on**: Self-hosted runner.
+- **Steps**:
+  - Checkout working branch.
+  - Initializes CodeQL tools for scanning.
+  - Performs CodeQL analysis for the specified language.
+
 ### `set-version`
 
-- **Purpose**: Perform static application secutrity testing using CodeQL, sets the version of the application based on the commit history. 
+- **Purpose**: Sets the version of the application based on the commit history.
 - **Runs on**: Self-hosted runner.
 
 ### `buildImage`
@@ -66,4 +75,3 @@ Make sure to replace placeholders with actual values in the workflow configurati
 Feel free to customize the workflow according to your project requirements.
 
 For any issues or queries, please reach out to [maintainer's email/contact].
-
