@@ -1,1 +1,1 @@
-const API_TOKEN = "secret1"
+const API_TOKEN = "AIzaSyAZdywNnp7KgPXMOtTGJmn46wFuUMKU2Ns"
