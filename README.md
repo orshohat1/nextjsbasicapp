@@ -1,77 +1,131 @@
-# Build and Deploy App to AKS with Helm
+# Next.js Basic App
 
-This GitHub Actions workflow automates the building and deploying process of an application to an AKS (Azure Kubernetes Service) cluster using Helm charts. The workflow consists of several jobs and steps:
+A Next.js application with automated GitHub Actions workflows for issue management and deployment to Azure Kubernetes Service (AKS).
 
-## Jobs and Their Purpose
+## Project Overview
 
-### `analyze`
+This repository contains:
+- A Next.js application built with TypeScript and Tailwind CSS
+- Automated GitHub Actions workflows for issue management
+- Helm charts for Kubernetes deployment
+- Docker configuration for containerization
 
-- **Purpose**: Conducts static application security testing using CodeQL for specified languages.
-- **Runs on**: Self-hosted runner.
-- **Steps**:
-  - Checkout working branch.
-  - Initializes CodeQL tools for scanning.
-  - Performs CodeQL analysis for the specified language.
+## Getting Started
 
-### `set-version`
+### Prerequisites
 
-- **Purpose**: Sets the version of the application based on the commit history.
-- **Runs on**: Self-hosted runner.
+- Node.js (v18 or later recommended)
+- npm or yarn
+- Docker (for containerization)
+- kubectl and Helm (for Kubernetes deployment)
 
-### `buildImage`
+### Installation
 
-- **Purpose**: Builds a Docker image for the application and pushes it to Azure Container Registry (ACR).
-- **Runs on**: Self-hosted runner.
-- **Steps**:
-  - Azure login for authentication.
-  - Building and pushing the Docker image.
-  - Scanning the Docker image for vulnerabilities using Trivy.
+```bash
+# Install dependencies
+npm install
 
-### `deploy`
+# Run development server
+npm run dev
 
-- **Purpose**: Deploys the application to the AKS cluster using Helm charts.
-- **Runs on**: Self-hosted runner.
-- **Steps**:
-  - Azure AKS login for cluster authentication.
-  - Helm dry-run for checking chart compatibility with Kubernetes APIs.
-  - Helm deployment with specified configurations and wait time.
+# Build for production
+npm run build
 
-### `post-deployment`
+# Start production server
+npm start
+```
 
-- **Purpose**: Executes post-deployment tests on the deployed application.
-- **Runs on**: Self-hosted runner.
-- **Steps**:
-  - Azure AKS login for cluster authentication.
-  - Execution of Helm tests on the deployed application.
+The application will be available at `http://localhost:3000`.
 
-### `tag-as-stable`
+## GitHub Actions Workflows
 
-- **Purpose**: Tags the image as stable in the Azure Container Registry.
-- **Runs on**: Self-hosted runner.
-- **Steps**:
-  - Azure login for ACR authentication.
-  - Tagging the Docker image as stable in the ACR.
+### Bug Reproduction Check
 
-## Workflow Trigger
+**File**: `.github/workflows/bug-reproduction-instructions.yml`
 
-The workflow is triggered manually using the `workflow_dispatch` event.
+Automatically analyzes new issues labeled as 'bug' using AI to determine if they contain sufficient reproduction information. If details are missing, the workflow posts a helpful comment guiding the reporter.
 
-## Environment Variables
+- **Trigger**: When issues are opened
+- **Filter**: Only runs for issues with 'bug' label
+- **AI Model**: mistral-ai/ministral-3b
 
-- `AZURE_CONTAINER_REGISTRY`: Azure Container Registry name.
-- `RESOURCE_GROUP`: Azure resource group name.
-- `CLUSTER_NAME`: AKS cluster name.
+### Weekly Issue Summary
 
-## Secrets Required
+**File**: `.github/workflows/weekly-issue-summary.yml`
+
+Creates a weekly summary of all issues created in the past 7 days.
+
+- **Trigger**: Every Monday at 9:00 UTC (or manual via workflow_dispatch)
+- **AI Model**: xai/grok-3-mini
+- **Output**: Opens a new issue with the summarized content
+
+## Deployment
+
+### AKS Deployment with Helm
+
+The project includes Helm charts in the `testapp/` directory for deploying to Azure Kubernetes Service.
+
+#### Jobs and Their Purpose
+
+**`analyze`**: Conducts static application security testing using CodeQL for specified languages.
+
+**`set-version`**: Sets the version of the application based on the commit history.
+
+**`buildImage`**: Builds a Docker image for the application and pushes it to Azure Container Registry (ACR). Includes vulnerability scanning with Trivy.
+
+**`deploy`**: Deploys the application to the AKS cluster using Helm charts with dry-run validation.
+
+**`post-deployment`**: Executes post-deployment tests on the deployed application.
+
+**`tag-as-stable`**: Tags the image as stable in the Azure Container Registry.
+
+#### Environment Variables
+
+- `AZURE_CONTAINER_REGISTRY`: Azure Container Registry name
+- `RESOURCE_GROUP`: Azure resource group name
+- `CLUSTER_NAME`: AKS cluster name
+
+#### Secrets Required
 
 - `AZURE_CLIENT_ID`
 - `AZURE_CLIENT_SECRET`
 - `AZURE_TENANT_ID`
 
-## Note
+## Project Structure
 
-Make sure to replace placeholders with actual values in the workflow configuration.
+```
+├── .github/
+│   └── workflows/          # GitHub Actions workflows
+├── app/                    # Next.js app directory
+│   ├── globals.css        # Global styles
+│   ├── layout.tsx         # Root layout
+│   ├── page.tsx           # Home page
+│   └── sql.ts             # SQL utilities
+├── public/                # Static assets
+├── testapp/               # Helm chart for deployment
+│   ├── templates/         # Kubernetes manifests
+│   ├── Chart.yaml         # Helm chart metadata
+│   └── values.yaml        # Default values
+├── weekly-issue-summary/  # Issue summary prompt configuration
+├── Dockerfile             # Docker build configuration
+├── next.config.js         # Next.js configuration
+├── tailwind.config.ts     # Tailwind CSS configuration
+└── tsconfig.json          # TypeScript configuration
+```
 
-Feel free to customize the workflow according to your project requirements.
+## Contributing
 
-For any issues or queries, please reach out to [maintainer's email/contact].
+When reporting bugs, please include:
+- Steps to reproduce the issue
+- Expected vs actual behavior
+- Environment details (browser, OS, versions)
+- Relevant logs or screenshots
+
+## License
+
+[Add your license information here]
+
+## Contact
+
+For issues or questions, please open an issue in this repository.
+
