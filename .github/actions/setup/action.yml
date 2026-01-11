@@ -1,0 +1,31 @@
+name: "Setup gh-aw actions"
+description: "Copy gh-aw action scripts to a destination so workflows can use them locally with gh-aw"
+inputs:
+  destination:
+    description: "Destination path where actions will be copied"
+    required: true
+    default: "/opt/gh-aw/actions"
+runs:
+  using: "composite"
+  steps:
+    - name: Ensure destination exists
+      shell: bash
+      run: |
+        mkdir -p "${{ inputs.destination }}"
+    - name: Clone gh-aw repository (shallow)
+      shell: bash
+      run: |
+        TMPDIR=$(mktemp -d)
+        git clone --depth=1 https://github.com/githubnext/gh-aw "$TMPDIR/gh-aw"
+        cp -a "$TMPDIR/gh-aw/actions/." "${{ inputs.destination }}" || true
+        cp -a "$TMPDIR/gh-aw/scripts/." "${{ inputs.destination }}" 2>/dev/null || true
+        # copy individual helper files if present
+        if [ -d "$TMPDIR/gh-aw/actions" ]; then
+          echo "Copied gh-aw actions to destination"
+        else
+          echo "Warning: gh-aw actions not found in cloned repo"
+        fi
+    - name: List destination
+      shell: bash
+      run: |
+        ls -la "${{ inputs.destination }}" | sed -n '1,200p'
