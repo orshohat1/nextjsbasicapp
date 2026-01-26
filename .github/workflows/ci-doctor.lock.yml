@@ -37,8 +37,7 @@ name: "CI Failure Doctor"
     types:
     - completed
     workflows:
-    - Daily Perf Improver
-    - Daily Test Coverage Improver
+    - Build and deploy an app to AKS with Helm
 
 permissions: read-all
 

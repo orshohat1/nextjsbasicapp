@@ -7,7 +7,7 @@ description: |
 
 on:
   workflow_run:
-    workflows: ["Daily Perf Improver", "Daily Test Coverage Improver"]  # Monitor the CI workflow specifically
+    workflows: ["Build and deploy an app to AKS with Helm"]  # Monitor the CI workflow specifically
     types:
       - completed
     branches:
