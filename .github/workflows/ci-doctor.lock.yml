@@ -1219,7 +1219,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      activated: ${{ 'true' }}
+      activated: ${{ steps.check_stop_time.outputs.stop_time_ok == 'true' }}
     steps:
       - name: Setup Scripts
         uses: githubnext/gh-aw/actions/setup@a933c835b5e2d12ae4dead665a0fdba420a2d421 # v0.36.0
@@ -1232,13 +1232,11 @@ jobs:
           GH_AW_STOP_TIME: 2026-02-26 16:22:53
           GH_AW_WORKFLOW_NAME: "CI Failure Doctor"
         with:
-          result-encoding: string
           script: |
             const { setupGlobals } = require('/opt/gh-aw/actions/setup_globals.cjs');
             setupGlobals(core, github, context, exec, io);
             const { main } = require('/opt/gh-aw/actions/check_stop_time.cjs');
             await main();
-            return 'true';
 
   safe_outputs:
     needs:
