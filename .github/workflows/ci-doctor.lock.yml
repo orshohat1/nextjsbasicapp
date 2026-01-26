@@ -1219,7 +1219,7 @@ jobs:
     permissions:
       contents: read
     outputs:
-      activated: 'true'
+      activated: ${{ 'true' }}
     steps:
       - name: Setup Scripts
         uses: githubnext/gh-aw/actions/setup@a933c835b5e2d12ae4dead665a0fdba420a2d421 # v0.36.0
